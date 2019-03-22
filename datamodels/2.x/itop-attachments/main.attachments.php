@@ -255,269 +255,24 @@ class AttachmentPlugIn implements iApplicationUIExtension, iApplicationObjectExt
 			$sTitle = ($iCount > 0)? Dict::Format('Attachments:TabTitle_Count', $iCount) : Dict::S('Attachments:EmptyTabTitle');
 			$oPage->SetCurrentTab($sTitle);
 		}
-		$oPage->add_style(
-<<<EOF
-.attachment {
-	display: inline-block;
-	text-align:center;
-	float:left;
-	padding:5px;	
-}
-.attachment:hover {
-	background-color: #e0e0e0;
-}
-.attachment img {
-	border: 0;
-}
-.attachment a {
-	text-decoration: none;
-	color: #1C94C4;
-}
-.btn_hidden {
-	display: none;
-}
-.drag_in {
-	-webkit-box-shadow:inset 0 0 10px 2px #1C94C4;
-	box-shadow:inset 0 0 10px 2px #1C94C4;
-}
-#history .attachment-history-added {
-	padding: 0;
-	float: none;
-}
-.inline-image {
-	cursor: zoom-in;
-}
-EOF
-		);
+
+		//TODO factory to choose proper renderer (using config param ? GUI switch widget ? ... ?)
+		$oAttachmentsRenderer = new IconAttachmentsRenderer();
 		$oPage->add('<fieldset>');
 		$oPage->add('<legend>'.Dict::S('Attachments:FieldsetTitle').'</legend>');
 
-		if ($bEditMode && !static::IsReadonlyState($oObject, $oObject->GetState(), static::ENUM_GUI_BACKOFFICE) )
+		$bIsReadOnlyState = AttachmentPlugIn::IsReadonlyState($oObject, $oObject->GetState(),
+			AttachmentPlugIn::ENUM_GUI_BACKOFFICE);
+		if ($bEditMode && !$bIsReadOnlyState)
 		{
-			$sIsDeleteEnabled = $this->m_bDeleteEnabled ? 'true' : 'false';
-			$sClass = get_class($oObject);
-			$sDeleteBtn = Dict::S('Attachments:DeleteBtn');
-			$oPage->add_script(
-<<<EOF
-	function RemoveAttachment(att_id)
-	{
-		var bDelete = true;
-		if ($('#display_attachment_'+att_id).hasClass('image-in-use'))
-		{
-				bDelete = window.confirm('This image is used in a description. Delete it anyway?');
-		}
-		if (bDelete)
-		{
-			$('#attachment_'+att_id).attr('name', 'removed_attachments[]');
-			$('#display_attachment_'+att_id).hide();
-			$('#attachment_plugin').trigger('remove_attachment', [att_id]);
-		}
-		return false; // Do not submit the form !
-	}
-EOF
-);
-			$oPage->add('<span id="attachments">');
-			while ($oAttachment = $oSet->Fetch())
-			{
-				$this->DisplayOneAttachment($oPage, $oAttachment);
-			}
-
-			// Display Temporary attachments
-			while ($oAttachment = $oSetTemp->Fetch())
-			{
-				$this->DisplayOneAttachment($oPage, $oAttachment, true);
-			}
-
-
-			// Suggested attachments are listed here but treated as temporary
-			$aDefault = utils::ReadParam('default', array(), false, 'raw_data');
-			if (array_key_exists('suggested_attachments', $aDefault))
-			{
-				$sSuggestedAttachements = $aDefault['suggested_attachments'];
-				if (is_array($sSuggestedAttachements))
-				{
-					$sSuggestedAttachements = implode(',', $sSuggestedAttachements);
-				}
-				$oSearch = DBObjectSearch::FromOQL("SELECT Attachment WHERE id IN($sSuggestedAttachements)");
-				$oSet = new DBObjectSet($oSearch, array());
-				if ($oSet->Count() > 0)
-				{
-					while ($oAttachment = $oSet->Fetch())
-					{
-						// Mark the attachments as temporary attachments for the current object/form
-						$oAttachment->Set('temp_id', $sTempId);
-						$oAttachment->DBUpdate();
-						// Display them
-						$this->DisplayOneAttachment($oPage, $oAttachment, true);
-					}
-				}
-			}
-
-			$oPage->add('</span>');
-			$oPage->add('<div style="clear:both"></div>');
-			$iMaxUploadInBytes = $this->GetMaxUploadSize();
-			$sMaxUploadLabel = $this->GetMaxUpload();
-			$sFileTooBigLabel = Dict::Format('Attachments:Error:FileTooLarge', $sMaxUploadLabel);
-			$sFileTooBigLabelForJS = addslashes($sFileTooBigLabel);
-			$oPage->p(Dict::S('Attachments:AddAttachment').'<input type="file" name="file" id="file"><span style="display:none;" id="attachment_loading">&nbsp;<img src="../images/indicator.gif"></span> '.$sMaxUploadLabel);
-			
-			$oPage->add_linked_script(utils::GetAbsoluteUrlAppRoot().'js/jquery.iframe-transport.js');
-			$oPage->add_linked_script(utils::GetAbsoluteUrlAppRoot().'js/jquery.fileupload.js');
-			
-			$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL;		
-			$oPage->add_ready_script(
-<<< EOF
-    $('#file').fileupload({
-		url: GetAbsoluteUrlModulesRoot()+'itop-attachments/ajax.attachment.php',
-		formData: { operation: 'add', temp_id: '$sTempId', obj_class: '$sClass' },
-        dataType: 'json',
-		pasteZone: null, // Don't accept files via Chrome's copy/paste
-        done: function (e, data) {
-			if(typeof(data.result.error) != 'undefined')
-			{
-				if(data.result.error != '')
-				{
-					alert(data.result.error);
-				}
-				else
-				{
-					var sDownloadLink = '$sDownloadLink'+data.result.att_id;
-					$('#attachments').append('<div class="attachment" id="display_attachment_'+data.result.att_id+'"><a data-preview="'+data.result.preview+'" href="'+sDownloadLink+'"><img src="'+data.result.icon+'"><br/>'+data.result.msg+'<input id="attachment_'+data.result.att_id+'" type="hidden" name="attachments[]" value="'+data.result.att_id+'"/></a><br/><input type="button" class="btn_hidden" value="{$sDeleteBtn}" onClick="RemoveAttachment('+data.result.att_id+');"/></div>');
-					if($sIsDeleteEnabled)
-					{
-						$('#display_attachment_'+data.result.att_id).hover( function() { $(this).children(':button').toggleClass('btn_hidden'); } );
-					}
-					$('#attachment_plugin').trigger('add_attachment', [data.result.att_id, data.result.msg, false /* inline image */]);
-				}
-			}
-        },
-	    send: function(e, data){
-	        // Don't send attachment if size is greater than PHP post_max_size, otherwise it will break the request and all its parameters (\$_REQUEST, \$_POST, ...)
-	        // Note: We loop on the files as the data structures is an array but in this case, we only upload 1 file at a time.
-	        var iTotalSizeInBytes = 0;
-	        for(var i = 0; i < data.files.length; i++)
-	        {
-	            iTotalSizeInBytes += data.files[i].size;
-	        }
-	        
-	        if(iTotalSizeInBytes > $iMaxUploadInBytes)
-	        {
-	            alert('$sFileTooBigLabelForJS');
-		        return false;
-		    }
-	    },
-        start: function() {
-        	$('#attachment_loading').show();
-		},
-        stop: function() {
-        	$('#attachment_loading').hide();
-		}
-    });
-
-	$(document).bind('dragover', function (e) {
-		var bFiles = false;
-		if (e.dataTransfer && e.dataTransfer.types)
-		{
-			for (var i = 0; i < e.dataTransfer.types.length; i++)
-			{
-				if (e.dataTransfer.types[i] == "application/x-moz-nativeimage")
-				{
-					bFiles = false; // mozilla contains "Files" in the types list when dragging images inside the page, but it also contains "application/x-moz-nativeimage" before
-					break;
-				}
-				
-				if (e.dataTransfer.types[i] == "Files")
-				{
-					bFiles = true;
-					break;
-				}
-			}
-		}
-	
-		if (!bFiles) return; // Not dragging files
-		
-		var dropZone = $('#file').closest('fieldset');
-		if (!dropZone.is(':visible'))
-		{
-			// Hidden, but inside an inactive tab? Higlight the tab
-			var sTabId = dropZone.closest('.ui-tabs-panel').attr('aria-labelledby');
-			dropZone = $('#'+sTabId).closest('li');
-		}
-	    timeout = window.dropZoneTimeout;
-	    if (!timeout) {
-	        dropZone.addClass('drag_in');
-	    } else {
-	        clearTimeout(timeout);
-	    }
-	    window.dropZoneTimeout = setTimeout(function () {
-	        window.dropZoneTimeout = null;
-	        dropZone.removeClass('drag_in');
-	    }, 300);
-	});
-	
-	// check if the attachments are used by inline images
-	window.setTimeout( function() {
-		$('.attachment a').each(function() {
-			var sUrl = $(this).attr('href');
-			if($('img[src="'+sUrl+'"]').length > 0)
-			{
-				$(this).addClass('image-in-use').find('img').wrap('<div class="image-in-use-wrapper" style="position:relative;display:inline-block;"></div>');
-			}
-		});
-		$('.htmlEditor').each(function() {
-			var oEditor = $(this).ckeditorGet();
-			var sHtml = oEditor.getData();
-			var jElement = $('<div/>').html(sHtml).contents();
-			jElement.find('img').each(function() {
-				var sSrc = $(this).attr('src');
-				$('.attachment a[href="'+sSrc+'"]').parent().addClass('image-in-use').find('img').wrap('<div class="image-in-use-wrapper" style="position:relative;display:inline-block;"></div>');
-			});
-		});
-		$('.image-in-use-wrapper').append('<div style="position:absolute;top:0;left:0;"><img src="../images/transp-lock.png"></div>');
-	}, 200 );
-EOF
-);
-			$oPage->p('<span style="display:none;" id="attachment_loading">Loading, please wait...</span>');
-			$oPage->p('<input type="hidden" id="attachment_plugin" name="attachment_plugin"/>');
-			if ($this->m_bDeleteEnabled)
-			{
-				$oPage->add_ready_script('$(".attachment").hover( function() {$(this).children(":button").toggleClass("btn_hidden"); } );');
-			}
+			$oAttachmentsRenderer->RenderEditAttachmentsList($oPage, $oSet, $oSetTemp, $oObject, $bEditMode, $this->m_bDeleteEnabled);
 		}
 		else
 		{
-			$oPage->add('<span id="attachments">');
-			if ($oSet->Count() == 0)
-			{
-				$oPage->add(Dict::S('Attachments:NoAttachment'));	
-			}
-			else
-			{
-				while ($oAttachment = $oSet->Fetch())
-				{
-					$iAttId = $oAttachment->GetKey();
-					$oDoc = $oAttachment->Get('contents');
-					$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
-					$sIcon = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
-					$sPreview = $oDoc->IsPreviewAvailable() ? 'true' : 'false';
-					$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL.$iAttId;
-					$oPage->add('<div class="attachment" id="attachment_'.$iAttId.'"><a data-preview="'.$sPreview.'" href="'.$sDownloadLink.'"><img src="'.$sIcon.'"><br/>'.$sFileName.'</a><input type="hidden" name="attachments[]" value="'.$iAttId.'"/><br/>&nbsp;&nbsp;</div>');
-				}
-			}
-			$oPage->add('</span>');
+			$oAttachmentsRenderer->RenderViewAttachmentsList($oPage, $oSet, $oSetTemp, $oObject, $bEditMode, $this->m_bDeleteEnabled);
 		}
+
 		$oPage->add('</fieldset>');
-		$sPreviewNotAvailable = addslashes(Dict::S('Attachments:PreviewNotAvailable'));
-		$iMaxWidth = MetaModel::GetModuleSetting('itop-attachments', 'preview_max_width', 290);
-		$oPage->add_ready_script(
-<<<EOF
-	$(document).tooltip({
-		items: '.attachment a',
-		position: { my: 'left top', at: 'right top', using: function( position, feedback ) { $( this ).css( position ); }},
-		content: function() { if ($(this).attr('data-preview') == 'true') { return('<img style=\"max-width:{$iMaxWidth}px\" src=\"'+$(this).attr('href')+'\"></img>');} else { return '$sPreviewNotAvailable'; }}
-	});
-EOF
-		);
 	}
 
 	protected static function UpdateAttachments($oObject, $oChange = null)
@@ -778,28 +533,6 @@ EOF
 
         return $bReadonly;
     }
-
-	/**
-	 * @param \WebPage $oPage
-	 * @param $oAttachment
-	 * @param bool $bIsTemporary
-	 *
-	 * @throws \Exception
-	 */
-	protected function DisplayOneAttachment(WebPage $oPage, $oAttachment, $bIsTemporary = false)
-	{
-		$iAttId = $oAttachment->GetKey();
-		$oDoc = $oAttachment->Get('contents');
-		$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
-		$sIcon = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
-		$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL.$iAttId;
-		$sPreview = $oDoc->IsPreviewAvailable() ? 'true' : 'false';
-		$oPage->add('<div class="attachment" id="display_attachment_'.$iAttId.'"><a data-preview="'.$sPreview.'" href="'.$sDownloadLink.'"><img src="'.$sIcon.'"><br/>'.$sFileName.'<input id="attachment_'.$iAttId.'" type="hidden" name="attachments[]" value="'.$iAttId.'"/></a><br/>&nbsp;<input id="btn_remove_'.$iAttId.'" type="button" class="btn_hidden" value="'.Dict::S('Attachments:DeleteBtn').'" onClick="RemoveAttachment('.$iAttId.');"/>&nbsp;</div>');
-		if ($bIsTemporary)
-		{
-			$oPage->add_ready_script("$('#attachment_plugin').trigger('add_attachment', [$iAttId, '".addslashes($sFileName)."', false /* not an line image */]);");
-		}
-	}
 }
 
 /**
@@ -898,3 +631,347 @@ class CMDBChangeOpAttachmentRemoved extends CMDBChangeOp
 	}
 }
 
+
+/**
+ * @see \AttachmentPlugIn::DisplayAttachments()
+ */
+interface iAttachmentsRendering
+{
+	/**
+	 * @param \WebPage $oPage
+	 * @param \DBObjectSet $oAttachmentsSet
+	 * @param $oTempAttachmentsSet
+	 * @param \DBObject $oObject
+	 * @param bool $bEditMode
+	 * @param bool $bDeleteEnabled
+	 */
+	public function RenderEditAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled);
+
+	public function RenderViewAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled);
+}
+
+
+class IconAttachmentsRenderer implements iAttachmentsRendering
+{
+	/**
+	 * @inheritDoc
+	 */
+	public function RenderEditAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled)
+	{
+		$this->AddSharedMarkup($oPage);
+
+		$iTransactionId = $oPage->GetTransactionId();
+		$sTempId = utils::GetUploadTempId($iTransactionId);
+		$sIsDeleteEnabled = $bDeleteEnabled ? 'true' : 'false';
+		$sClass = get_class($oObject);
+		$sDeleteBtn = Dict::S('Attachments:DeleteBtn');
+		$oPage->add_script(
+			<<<EOF
+	function RemoveAttachment(att_id)
+	{
+		var bDelete = true;
+		if ($('#display_attachment_'+att_id).hasClass('image-in-use'))
+		{
+				bDelete = window.confirm('This image is used in a description. Delete it anyway?');
+		}
+		if (bDelete)
+		{
+			$('#attachment_'+att_id).attr('name', 'removed_attachments[]');
+			$('#display_attachment_'+att_id).hide();
+			$('#attachment_plugin').trigger('remove_attachment', [att_id]);
+		}
+		return false; // Do not submit the form !
+	}
+EOF
+		);
+		$oPage->add('<span id="attachments">');
+		while ($oAttachment = $oAttachmentsSet->Fetch())
+		{
+			$this->DisplayOneAttachment($oPage, $oAttachment);
+		}
+
+		// Display Temporary attachments
+		while ($oAttachment = $oTempAttachmentsSet->Fetch())
+		{
+			$this->DisplayOneAttachment($oPage, $oAttachment, true);
+		}
+
+
+		// Suggested attachments are listed here but treated as temporary
+		$aDefault = utils::ReadParam('default', array(), false, 'raw_data');
+		if (array_key_exists('suggested_attachments', $aDefault))
+		{
+			$sSuggestedAttachements = $aDefault['suggested_attachments'];
+			if (is_array($sSuggestedAttachements))
+			{
+				$sSuggestedAttachements = implode(',', $sSuggestedAttachements);
+			}
+			$oSearch = DBObjectSearch::FromOQL("SELECT Attachment WHERE id IN($sSuggestedAttachements)");
+			$oSet = new DBObjectSet($oSearch, array());
+			if ($oSet->Count() > 0)
+			{
+				while ($oAttachment = $oSet->Fetch())
+				{
+					// Mark the attachments as temporary attachments for the current object/form
+					$oAttachment->Set('temp_id', $sTempId);
+					$oAttachment->DBUpdate();
+					// Display them
+					$this->DisplayOneAttachment($oPage, $oAttachment, true);
+				}
+			}
+		}
+
+		$oPage->add('</span>');
+		$oPage->add('<div style="clear:both"></div>');
+		$iMaxUploadInBytes = AttachmentPlugIn::GetMaxUploadSize();
+		$sMaxUploadLabel = AttachmentPlugIn::GetMaxUpload();
+		$sFileTooBigLabel = Dict::Format('Attachments:Error:FileTooLarge', $sMaxUploadLabel);
+		$sFileTooBigLabelForJS = addslashes($sFileTooBigLabel);
+		$oPage->p(Dict::S('Attachments:AddAttachment').'<input type="file" name="file" id="file"><span style="display:none;" id="attachment_loading">&nbsp;<img src="../images/indicator.gif"></span> '.$sMaxUploadLabel);
+
+		$oPage->add_linked_script(utils::GetAbsoluteUrlAppRoot().'js/jquery.iframe-transport.js');
+		$oPage->add_linked_script(utils::GetAbsoluteUrlAppRoot().'js/jquery.fileupload.js');
+
+		$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL;
+		$oPage->add_ready_script(
+			<<< EOF
+    $('#file').fileupload({
+		url: GetAbsoluteUrlModulesRoot()+'itop-attachments/ajax.attachment.php',
+		formData: { operation: 'add', temp_id: '$sTempId', obj_class: '$sClass' },
+        dataType: 'json',
+		pasteZone: null, // Don't accept files via Chrome's copy/paste
+        done: function (e, data) {
+			if(typeof(data.result.error) != 'undefined')
+			{
+				if(data.result.error != '')
+				{
+					alert(data.result.error);
+				}
+				else
+				{
+					var sDownloadLink = '$sDownloadLink'+data.result.att_id;
+					$('#attachments').append('<div class="attachment" id="display_attachment_'+data.result.att_id+'"><a data-preview="'+data.result.preview+'" href="'+sDownloadLink+'"><img src="'+data.result.icon+'"><br/>'+data.result.msg+'<input id="attachment_'+data.result.att_id+'" type="hidden" name="attachments[]" value="'+data.result.att_id+'"/></a><br/><input type="button" class="btn_hidden" value="{$sDeleteBtn}" onClick="RemoveAttachment('+data.result.att_id+');"/></div>');
+					if($sIsDeleteEnabled)
+					{
+						$('#display_attachment_'+data.result.att_id).hover( function() { $(this).children(':button').toggleClass('btn_hidden'); } );
+					}
+					$('#attachment_plugin').trigger('add_attachment', [data.result.att_id, data.result.msg, false /* inline image */]);
+				}
+			}
+        },
+	    send: function(e, data){
+	        // Don't send attachment if size is greater than PHP post_max_size, otherwise it will break the request and all its parameters (\$_REQUEST, \$_POST, ...)
+	        // Note: We loop on the files as the data structures is an array but in this case, we only upload 1 file at a time.
+	        var iTotalSizeInBytes = 0;
+	        for(var i = 0; i < data.files.length; i++)
+	        {
+	            iTotalSizeInBytes += data.files[i].size;
+	        }
+	        
+	        if(iTotalSizeInBytes > $iMaxUploadInBytes)
+	        {
+	            alert('$sFileTooBigLabelForJS');
+		        return false;
+		    }
+	    },
+        start: function() {
+        	$('#attachment_loading').show();
+		},
+        stop: function() {
+        	$('#attachment_loading').hide();
+		}
+    });
+
+	$(document).bind('dragover', function (e) {
+		var bFiles = false;
+		if (e.dataTransfer && e.dataTransfer.types)
+		{
+			for (var i = 0; i < e.dataTransfer.types.length; i++)
+			{
+				if (e.dataTransfer.types[i] == "application/x-moz-nativeimage")
+				{
+					bFiles = false; // mozilla contains "Files" in the types list when dragging images inside the page, but it also contains "application/x-moz-nativeimage" before
+					break;
+				}
+				
+				if (e.dataTransfer.types[i] == "Files")
+				{
+					bFiles = true;
+					break;
+				}
+			}
+		}
+	
+		if (!bFiles) return; // Not dragging files
+		
+		var dropZone = $('#file').closest('fieldset');
+		if (!dropZone.is(':visible'))
+		{
+			// Hidden, but inside an inactive tab? Higlight the tab
+			var sTabId = dropZone.closest('.ui-tabs-panel').attr('aria-labelledby');
+			dropZone = $('#'+sTabId).closest('li');
+		}
+	    timeout = window.dropZoneTimeout;
+	    if (!timeout) {
+	        dropZone.addClass('drag_in');
+	    } else {
+	        clearTimeout(timeout);
+	    }
+	    window.dropZoneTimeout = setTimeout(function () {
+	        window.dropZoneTimeout = null;
+	        dropZone.removeClass('drag_in');
+	    }, 300);
+	});
+	
+	// check if the attachments are used by inline images
+	window.setTimeout( function() {
+		$('.attachment a').each(function() {
+			var sUrl = $(this).attr('href');
+			if($('img[src="'+sUrl+'"]').length > 0)
+			{
+				$(this).addClass('image-in-use').find('img').wrap('<div class="image-in-use-wrapper" style="position:relative;display:inline-block;"></div>');
+			}
+		});
+		$('.htmlEditor').each(function() {
+			var oEditor = $(this).ckeditorGet();
+			var sHtml = oEditor.getData();
+			var jElement = $('<div/>').html(sHtml).contents();
+			jElement.find('img').each(function() {
+				var sSrc = $(this).attr('src');
+				$('.attachment a[href="'+sSrc+'"]').parent().addClass('image-in-use').find('img').wrap('<div class="image-in-use-wrapper" style="position:relative;display:inline-block;"></div>');
+			});
+		});
+		$('.image-in-use-wrapper').append('<div style="position:absolute;top:0;left:0;"><img src="../images/transp-lock.png"></div>');
+	}, 200 );
+EOF
+		);
+		$oPage->p('<span style="display:none;" id="attachment_loading">Loading, please wait...</span>');
+		$oPage->p('<input type="hidden" id="attachment_plugin" name="attachment_plugin"/>');
+		if ($bDeleteEnabled)
+		{
+			$oPage->add_ready_script('$(".attachment").hover( function() {$(this).children(":button").toggleClass("btn_hidden"); } );');
+		}
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function RenderViewAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled)
+	{
+		$this->AddSharedMarkup($oPage);
+
+		$oPage->add('<span id="attachments">');
+		if ($oAttachmentsSet->Count() == 0)
+		{
+			$oPage->add(Dict::S('Attachments:NoAttachment'));
+		}
+		else
+		{
+			while ($oAttachment = $oAttachmentsSet->Fetch())
+			{
+				$iAttId = $oAttachment->GetKey();
+				$oDoc = $oAttachment->Get('contents');
+				$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
+				$sIcon = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
+				$sPreview = $oDoc->IsPreviewAvailable() ? 'true' : 'false';
+				$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL.$iAttId;
+				$oPage->add('<div class="attachment" id="attachment_'.$iAttId.'"><a data-preview="'.$sPreview.'" href="'.$sDownloadLink.'"><img src="'.$sIcon.'"><br/>'.$sFileName.'</a><input type="hidden" name="attachments[]" value="'.$iAttId.'"/><br/>&nbsp;&nbsp;</div>');
+			}
+		}
+		$oPage->add('</span>');
+
+	}
+
+	private function AddSharedMarkup($oPage)
+	{
+		$oPage->add_style(
+			<<<EOF
+.attachment {
+	display: inline-block;
+	text-align:center;
+	float:left;
+	padding:5px;	
+}
+.attachment:hover {
+	background-color: #e0e0e0;
+}
+.attachment img {
+	border: 0;
+}
+.attachment a {
+	text-decoration: none;
+	color: #1C94C4;
+}
+.btn_hidden {
+	display: none;
+}
+.drag_in {
+	-webkit-box-shadow:inset 0 0 10px 2px #1C94C4;
+	box-shadow:inset 0 0 10px 2px #1C94C4;
+}
+#history .attachment-history-added {
+	padding: 0;
+	float: none;
+}
+.inline-image {
+	cursor: zoom-in;
+}
+EOF
+		);
+
+		$iMaxWidth = MetaModel::GetModuleSetting('itop-attachments', 'preview_max_width', 290);
+		$sPreviewNotAvailable = addslashes(Dict::S('Attachments:PreviewNotAvailable'));
+		$oPage->add_ready_script(
+			<<<EOF
+$(document).tooltip({
+	items: '.attachment a',
+	position: { my: 'left top', at: 'right top', using: function( position, feedback ) { $( this ).css( position ); }},
+	content: function() { if ($(this).attr('data-preview') == 'true') { return('<img style=\"max-width:{$iMaxWidth}px\" src=\"'+$(this).attr('href')+'\"></img>');} else { return '$sPreviewNotAvailable'; }}
+});
+EOF
+		);
+	}
+
+	/**
+	 * @param \WebPage $oPage
+	 * @param $oAttachment
+	 * @param bool $bIsTemporary
+	 *
+	 * @throws \Exception
+	 */
+	protected function DisplayOneAttachment(WebPage $oPage, $oAttachment, $bIsTemporary = false)
+	{
+		$iAttId = $oAttachment->GetKey();
+		/** @var \ormDocument $oDoc */
+		$oDoc = $oAttachment->Get('contents');
+		$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
+		$sIcon = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
+		$sDownloadLink = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL.$iAttId;
+		$sPreview = $oDoc->IsPreviewAvailable() ? 'true' : 'false';
+		$oPage->add('<div class="attachment" id="display_attachment_'.$iAttId.'"><a data-preview="'.$sPreview.'" href="'.$sDownloadLink.'"><img src="'.$sIcon.'"><br/>'.$sFileName.'<input id="attachment_'.$iAttId.'" type="hidden" name="attachments[]" value="'.$iAttId.'"/></a><br/>&nbsp;<input id="btn_remove_'.$iAttId.'" type="button" class="btn_hidden" value="'.Dict::S('Attachments:DeleteBtn').'" onClick="RemoveAttachment('.$iAttId.');"/>&nbsp;</div>');
+		if ($bIsTemporary)
+		{
+			$oPage->add_ready_script("$('#attachment_plugin').trigger('add_attachment', [$iAttId, '".addslashes($sFileName)."', false /* not an line image */]);");
+		}
+	}
+}
+
+
+class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
+{
+	/**
+	 * @inheritDoc
+	 */
+	public function RenderEditAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled)
+	{
+		// TODO: Implement RenderEditAttachmentsList() method.
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function RenderViewAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled)
+	{
+		// TODO: Implement RenderViewAttachmentsList() method.
+	}
+}
