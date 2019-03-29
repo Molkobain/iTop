@@ -58,3 +58,11 @@ Dict::Add('EN US', 'English', 'English', array(
 	'Class:Attachment/Attribute:contents' => 'Contents',
 	'Class:Attachment/Attribute:contents+' => '',
 ));
+
+
+Dict::Add('EN US', 'English', 'English', array(
+	'Attachments:File:Name' => 'File name',
+	'Attachments:File:Date' => 'Date added',
+	'Attachments:File:Size' => 'Size',
+	'Attachments:File:MimeType' => 'Type',
+));
