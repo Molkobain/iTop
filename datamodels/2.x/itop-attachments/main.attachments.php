@@ -633,6 +633,48 @@ class CMDBChangeOpAttachmentRemoved extends CMDBChangeOp
 }
 
 
+class AttachmentsHelper
+{
+	/**
+	 * @param \DBObject $oObject
+	 *
+	 * @return array containing attachment_id as key and date as value
+	 */
+	public static function GetAttachmentsDateAddedFromDb($oObject)
+	{
+		$sObjClass = get_class($oObject);
+		$iObjKey = $oObject->GetKey();
+		$sQuery = "SELECT CMDBChangeOpAttachmentAdded WHERE objclass='$sObjClass' AND objkey=$iObjKey";
+		try
+		{
+			$oSearch = DBObjectSearch::FromOQL($sQuery);
+		}
+		catch (OQLException $e)
+		{
+			return array();
+		}
+		$oSet = new DBObjectSet($oSearch);
+
+		try
+		{
+			$aAttachmentDates = array();
+			while ($oChangeOpAttAdded = $oSet->Fetch())
+			{
+				$iAttachmentId = $oChangeOpAttAdded->Get('attachment_id');
+				$sAttachmentDate = $oChangeOpAttAdded->Get('date');
+				$aAttachmentDates[$iAttachmentId] = $sAttachmentDate;
+			}
+		}
+		catch (Exception $e)
+		{
+			return array();
+		}
+
+		return $aAttachmentDates;
+	}
+}
+
+
 /**
  * @see \AttachmentPlugIn::DisplayAttachments()
  */
@@ -998,7 +1040,7 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 		else
 		{
 			$bIsEven = false;
-			$aAttachmentsDate = $this->GetAttachmentsDateAddedFromDb($oObject);
+			$aAttachmentsDate = AttachmentsHelper::GetAttachmentsDateAddedFromDb($oObject);
 			while ($oAttachment = $oAttachmentsSet->Fetch())
 			{
 				$sLineClass = '';
@@ -1030,43 +1072,5 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 
 		$oPage->add('</tbody>'.PHP_EOL);
 		$oPage->add('</table>'.PHP_EOL);
-	}
-
-	/**
-	 * @param \DBObject $oObject
-	 *
-	 * @return array containing attachment_id as key and date as value
-	 */
-	private function GetAttachmentsDateAddedFromDb($oObject)
-	{
-		$sObjClass = get_class($oObject);
-		$iObjKey = $oObject->GetKey();
-		$sQuery = "SELECT CMDBChangeOpAttachmentAdded WHERE objclass='$sObjClass' AND objkey=$iObjKey";
-		try
-		{
-			$oSearch = DBObjectSearch::FromOQL($sQuery);
-		}
-		catch (OQLException $e)
-		{
-			return array();
-		}
-		$oSet = new DBObjectSet($oSearch);
-
-		try
-		{
-			$aAttachmentDates = array();
-			while ($oChangeOpAttAdded = $oSet->Fetch())
-			{
-				$iAttachmentId = $oChangeOpAttAdded->Get('attachment_id');
-				$sAttachmentDate = $oChangeOpAttAdded->Get('date');
-				$aAttachmentDates[$iAttachmentId] = $sAttachmentDate;
-			}
-		}
-		catch (Exception $e)
-		{
-			return array();
-		}
-
-		return $aAttachmentDates;
 	}
 }
