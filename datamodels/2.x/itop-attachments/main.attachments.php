@@ -1023,8 +1023,9 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 	 */
 	public function RenderViewAttachmentsList($oPage, $oAttachmentsSet, $oTempAttachmentsSet, $oObject, $bEditMode, $bDeleteEnabled)
 	{
-		$oPage->add('<table class="listResults">'.PHP_EOL);
+		$oPage->add('<table class="listResults attachmentsList">'.PHP_EOL);
 		$oPage->add('<thead>'.PHP_EOL);
+		$oPage->add('  <th>'.Dict::S('Attachments:File:Thumbnail').'</th>'.PHP_EOL);
 		$oPage->add('  <th>'.Dict::S('Attachments:File:Name').'</th>'.PHP_EOL);
 		$oPage->add('  <th>'.Dict::S('Attachments:File:Size').'</th>'.PHP_EOL);
 		$oPage->add('  <th>'.Dict::S('Attachments:File:Date').'</th>'.PHP_EOL);
@@ -1039,6 +1040,38 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 		}
 		else
 		{
+			$iMaxWidth = MetaModel::GetModuleSetting('itop-attachments', 'preview_max_width', 290);
+			$sPreviewNotAvailable = addslashes(Dict::S('Attachments:PreviewNotAvailable'));
+			$oPage->add_ready_script(
+				<<<EOF
+$(document).tooltip({
+	items: 'table.attachmentsList>tbody>tr>td:first-child>img',
+	position: {
+		my: 'left top', at: 'right top', using: function (position, feedback) {
+			$(this).css(position);
+		}
+	},
+	content: function () {
+		if ($(this).hasClass("preview"))
+		{
+			return ('<img style=\"max-width:{$iMaxWidth}px\" src=\"'+$(this).attr('src')+'\"></img>');
+		}
+		else
+		{
+			return '$sPreviewNotAvailable';
+		}
+	}
+});
+EOF
+			);
+			$oPage->add_style(
+				<<<EOF
+table.attachmentsList>tbody>tr>td:first-child {
+	text-align: center;
+}
+EOF
+			);
+
 			$bIsEven = false;
 			$aAttachmentsDate = AttachmentsHelper::GetAttachmentsDateAddedFromDb($oObject);
 			while ($oAttachment = $oAttachmentsSet->Fetch())
@@ -1062,6 +1095,20 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 				$sAttachmentDate = array_key_exists($iAttachmentId, $aAttachmentsDate) ? $aAttachmentsDate[$iAttachmentId] : 'N/A';
 				$sFileType = $oDoc->GetMimeType();
 
+				$sIconClass = '';
+				if ($oDoc->IsPreviewAvailable())
+				{
+					$sAttachmentThumbUrl = utils::GetAbsoluteUrlAppRoot().ATTACHMENT_DOWNLOAD_URL.$iAttachmentId;
+					$sIconClass = ' class="preview"';
+				}
+				else
+				{
+					$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
+					$sAttachmentThumbUrl = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
+				}
+
+				$oPage->add('  <tr>'.PHP_EOL);
+				$oPage->add('    <td><img'.$sIconClass.' style="max-height: 48px;" src="'.$sAttachmentThumbUrl.'"></td>'.PHP_EOL);
 				$oPage->add('    <td>'.$sFileName.'</td>'.PHP_EOL);
 				$oPage->add('    <td>'.$sFileSize.'</td>'.PHP_EOL);
 				$oPage->add('    <td>'.$sAttachmentDate.'</td>'.PHP_EOL);
