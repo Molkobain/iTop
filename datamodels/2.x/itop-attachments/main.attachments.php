@@ -1043,7 +1043,7 @@ class TableDetailsAttachmentsRenderer implements iAttachmentsRendering
 			$iMaxWidth = MetaModel::GetModuleSetting('itop-attachments', 'preview_max_width', 290);
 			$sPreviewNotAvailable = addslashes(Dict::S('Attachments:PreviewNotAvailable'));
 			$oPage->add_ready_script(
-				<<<EOF
+				<<<JS
 $(document).tooltip({
 	items: 'table.attachmentsList>tbody>tr>td:first-child>img',
 	position: {
@@ -1062,14 +1062,14 @@ $(document).tooltip({
 		}
 	}
 });
-EOF
+JS
 			);
 			$oPage->add_style(
-				<<<EOF
+				<<<CSS
 table.attachmentsList>tbody>tr>td:first-child {
 	text-align: center;
 }
-EOF
+CSS
 			);
 
 			$bIsEven = false;
