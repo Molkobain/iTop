@@ -257,8 +257,8 @@ class AttachmentPlugIn implements iApplicationUIExtension, iApplicationObjectExt
 		}
 
 		//TODO factory to choose proper renderer (using config param ? GUI switch widget ? ... ?)
-//		$oAttachmentsRenderer = new IconAttachmentsRenderer();
-		$oAttachmentsRenderer = new TableDetailsAttachmentsRenderer();
+		$oAttachmentsRenderer = new IconAttachmentsRenderer();
+//		$oAttachmentsRenderer = new TableDetailsAttachmentsRenderer();
 		$oPage->add('<fieldset>');
 		$oPage->add('<legend>'.Dict::S('Attachments:FieldsetTitle').'</legend>');
 
@@ -1086,7 +1086,6 @@ CSS
 				{
 					$bIsEven = true;
 				}
-				$oPage->add("  <tr$sLineClass>".PHP_EOL);
 				/** @var \ormDocument $oDoc */
 				$oDoc = $oAttachment->Get('contents');
 				$sFileName = htmlentities($oDoc->GetFileName(), ENT_QUOTES, 'UTF-8');
@@ -1107,7 +1106,7 @@ CSS
 					$sAttachmentThumbUrl = utils::GetAbsoluteUrlAppRoot().AttachmentPlugIn::GetFileIcon($sFileName);
 				}
 
-				$oPage->add('  <tr>'.PHP_EOL);
+				$oPage->add("  <tr$sLineClass>".PHP_EOL);
 				$oPage->add('    <td><img'.$sIconClass.' style="max-height: 48px;" src="'.$sAttachmentThumbUrl.'"></td>'.PHP_EOL);
 				$oPage->add('    <td>'.$sFileName.'</td>'.PHP_EOL);
 				$oPage->add('    <td>'.$sFileSize.'</td>'.PHP_EOL);
